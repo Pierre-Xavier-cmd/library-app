@@ -1,0 +1,87 @@
+Passer au contenu principal
+SUPINFO
+Accueil
+Tableau de bord
+Mes cours
+EDSQUARE
+
+[Project] - Library
+3WEBD
+[Project] - Library
+Conditions d’achèvement
+Ouvert le : mardi 20 janvier 2026, 16:00
+À rendre : lundi 9 février 2026, 23:59
+1 - Project overview
+As a member of a development team, you'll be asked to build a graphical interface for your town's library website.
+
+This project need to be done by a team of 2 people at most.
+Only the frontend part is asked on this project, the datasets / API is from Open Library.
+
+ 
+
+2 - Features
+You need to develop multiples functionalities
+
+A "quick" search functionality (visible on all pages) that allow you to search on all books of the collections
+A "more advanced' search functionality (on a specific page) which allow you to query something really specific - you have a full list of parameter from the API documentation (for examples search on a author, date, tags..)
+On the first page (main page / index) you should display some of the recents changes of documents (cf. RecentChanges API)
+A page to display a specific object
+Users can access this page through the search bar, advanced search or others possibles like
+You need to display multiples information (book cover, name, department, period, author...). You are free to add more useful information depending on the search / article
+Try to display it at best, you have to think this solution will be used by the Meth
+When displaying some information about specific books, you should also search Wikipedia to get some additional information
+Display a short description from Wikipedia
+You can also display the book cover from Wikipedia
+Add a link to the Wikipedia page
+Testing is important. You are required to implement a few tests on your project. Focus on testing the core functionalities first
+UI/UX is crucial for this project.
+Building a responsive website is mandatory
+ 
+
+3 - Information
+Additional information:
+
+API spec: https://openlibrary.org/developers/api
+
+For the information related to Wikipedia, there is multiple ways and API. Use the one you do prefer
+
+ 
+
+4 - Deliverables
+You need to submit an archive containing the source code of your project. With a README.md for the installation steps and to be able to run your project.
+
+
+
+5 - Graded items
+Code:
+
+Search feature: 2pts
+Advanced search: 2pts
+Main/Index page: 3pts
+Item page: 3pts
+Wikipedia data: 2pts
+On each feature 1/3 of the points is relative to code quality and security. For example if "book page" crash or isn't protected when "non-id" parameters are being used (or error non handled) you can loose 1pt Code quality include check on parameters, handling error but also code split
+
+Architecture: 4pts
+
+Test: 2pts
+
+UI/UX: 2pts
+
+
+Statut de remise
+Statut des travaux remis	Aucun devoir n’a encore été remis
+Statut de l’évaluation	Non évalué
+Temps restant	2 jours 9 heures restants
+Dernière modification	-
+Commentaires	
+Commentaires (0)
+Activité précédente
+Aller à…
+Aller à…
+Activité suivante
+Contactez-nous
+  
+Suivez-nous
+    
+Connecté sous le nom « Pierre-xavier Velon » (Déconnexion)
