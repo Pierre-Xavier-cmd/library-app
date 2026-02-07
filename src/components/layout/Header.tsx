@@ -20,18 +20,20 @@ export function Header() {
   }
 
   return (
-    <header style={{ padding: 16, borderBottom: "1px solid #e5e5e5", background: "white" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", gap: 12, alignItems: "center" }}>
-        <Link to="/" style={{ fontWeight: 700, textDecoration: "none", color: "inherit" }}>
-          📚 Library
-        </Link>
+    <header data-site-header>
+      <nav data-container data-header>
+        <div data-nav-links>
+          <Link to="/" data-brand>
+            Library
+          </Link>
+          <Link to="/advanced-search">Advanced search</Link>
+        </div>
 
-        <form onSubmit={onSubmit} style={{ display: "flex", gap: 8, flex: 1 }}>
+        <form onSubmit={onSubmit} data-search-form>
           <select
             value={type}
             onChange={(e) => setType(e.target.value as SearchType)}
             aria-label="Search type"
-            style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd", background: "white" }}
           >
             <option value="title">Title</option>
             <option value="author">Author</option>
@@ -41,30 +43,12 @@ export function Header() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={type === "title" ? "Search by title…" : "Search by author…"}
-            style={{
-              flex: 1,
-              padding: "8px 10px",
-              borderRadius: 10,
-              border: "1px solid #ddd",
-              outline: "none",
-            }}
+            aria-label="Search"
           />
 
-          <button
-            type="submit"
-            style={{
-              padding: "8px 12px",
-              borderRadius: 10,
-              border: "1px solid #111",
-              background: "#111",
-              color: "white",
-              cursor: "pointer",
-            }}
-          >
-            Search
-          </button>
+          <button type="submit">Search</button>
         </form>
-      </div>
+      </nav>
     </header>
   );
 }

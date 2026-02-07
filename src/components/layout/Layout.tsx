@@ -4,13 +4,12 @@ import { Footer } from "./Footer";
 
 export function Layout() {
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div data-app>
       <Header />
-      <main style={{ flex: 1, padding: 16 }}>
+      <main data-container>
         <Outlet />
       </main>
       <Footer />
     </div>
   );
 }
-
