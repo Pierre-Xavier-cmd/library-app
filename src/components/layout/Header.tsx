@@ -7,7 +7,7 @@ export function Header() {
   const navigate = useNavigate();
   const [sp] = useSearchParams();
 
-  // initialise depuis l’URL (si on recharge la page)
+  // Initialise depuis l'URL (si on recharge la page).
   const [q, setQ] = useState(sp.get("q") ?? "");
   const [type, setType] = useState<SearchType>((sp.get("type") as SearchType) || "title");
 
@@ -16,40 +16,46 @@ export function Header() {
     const query = q.trim();
     if (!query) return;
 
-    // redirige vers Home avec paramètres (marche depuis n'importe quelle page)
+    // Redirige vers l'accueil avec paramètres (depuis n'importe quelle page).
     navigate(`/?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
   }
 
   return (
-    <header data-site-header>
-      <nav data-container data-header>
-        <div data-nav-links>
-          <Link to="/" data-brand>
-            Library
-          </Link>
-          <Link to="/advanced-search">Advanced search</Link>
-        </div>
+    <header className="container">
+      <nav>
+        <ul>
+          <li>
+            <strong>
+              <Link to="/">Bibliotheque</Link>
+            </strong>
+          </li>
+          <li>
+            <Link to="/advanced-search">Recherche avancee</Link>
+          </li>
+        </ul>
+      </nav>
 
-        <form onSubmit={onSubmit} data-search-form>
+      <form onSubmit={onSubmit} className="search-form">
+        <fieldset role="group">
           <select
             value={type}
             onChange={(e) => setType(e.target.value as SearchType)}
-            aria-label="Search type"
+            aria-label="Type de recherche"
           >
-            <option value="title">Title</option>
-            <option value="author">Author</option>
+            <option value="title">Titre</option>
+            <option value="author">Auteur</option>
           </select>
 
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={type === "title" ? "Search by title…" : "Search by author…"}
-            aria-label="Search"
+            placeholder={type === "title" ? "Rechercher par titre…" : "Rechercher par auteur…"}
+            aria-label="Recherche"
           />
 
-          <button type="submit">Search</button>
-        </form>
-      </nav>
+          <button type="submit">Rechercher</button>
+        </fieldset>
+      </form>
     </header>
   );
 }

@@ -1,13 +1,11 @@
-export type SearchType = "title" | "author";
+import type {
+  Book,
+  BookDetails,
+  RecentChange,
+  SearchBooksParams,
+} from "./openLibrary.types";
 
-export type Book = {
-  workKey: string;   // "/works/OL123W"
-  workId: string;    // "OL123W"
-  title: string;
-  authorName?: string;
-  firstPublishYear?: number;
-  coverId?: number;
-};
+export type { Book, BookDetails, RecentChange, SearchBooksParams, SearchType } from "./openLibrary.types";
 
 const BASE = "https://openlibrary.org";
 
@@ -16,49 +14,102 @@ function toWorkId(workKey: string) {
   return parts[parts.length - 1] || workKey;
 }
 
-export async function quickSearchBooks(params: {
-  q: string;
-  type: SearchType;
-  page?: number;
-  signal?: AbortSignal;
-}): Promise<{ books: Book[]; total: number }> {
-  const { q, type, page = 1, signal } = params;
-  const query = q.trim();
-  if (!query) return { books: [], total: 0 };
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function asNumber(value: unknown): number | undefined {
+  return typeof value === "number" ? value : undefined;
+}
+
+function parseSearchDoc(rawDoc: unknown): Book | null {
+  if (!isRecord(rawDoc)) return null;
+
+  const workKey = asString(rawDoc.key);
+  if (!workKey) return null;
+
+  const authorName = Array.isArray(rawDoc.author_name)
+    ? rawDoc.author_name.find((name): name is string => typeof name === "string")
+    : undefined;
+
+  return {
+    workKey,
+    workId: toWorkId(workKey),
+    title: asString(rawDoc.title) ?? "Sans titre",
+    authorName,
+    firstPublishYear: asNumber(rawDoc.first_publish_year),
+    coverId: asNumber(rawDoc.cover_i),
+  };
+}
+
+function parseSearchResponse(data: unknown): { books: Book[]; total: number } {
+  if (!isRecord(data)) return { books: [], total: 0 };
+
+  const docs = Array.isArray(data.docs) ? data.docs : [];
+  const books = docs
+    .map(parseSearchDoc)
+    .filter((book): book is Book => book !== null);
+
+  return { books, total: asNumber(data.numFound) ?? books.length };
+}
+
+function setSearchParam(url: URL, key: string, value?: string | number) {
+  if (value === undefined) return;
+  const text = String(value).trim();
+  if (!text) return;
+  url.searchParams.set(key, text);
+}
+
+export async function searchBooks(params: SearchBooksParams): Promise<{ books: Book[]; total: number }> {
+  const {
+    q,
+    type = "title",
+    title,
+    author,
+    first_publish_year,
+    language,
+    subject,
+    page = 1,
+    signal,
+  } = params;
 
   const url = new URL(`${BASE}/search.json`);
-  url.searchParams.set(type, query);
+
+  const quickQuery = q?.trim();
+  if (quickQuery) {
+    setSearchParam(url, type, quickQuery);
+  } else {
+    setSearchParam(url, "title", title);
+    setSearchParam(url, "author", author);
+    if (first_publish_year !== undefined) {
+      setSearchParam(url, "first_publish_year", first_publish_year);
+    }
+    setSearchParam(url, "language", language);
+    setSearchParam(url, "subject", subject);
+  }
+
+  if ([...url.searchParams.keys()].length === 0) {
+    return { books: [], total: 0 };
+  }
+
   url.searchParams.set("page", String(page));
 
   try {
     const res = await fetch(url.toString(), { signal });
     if (!res.ok) {
-      // Gérer les erreurs HTTP de manière plus informative
-      if (res.status === 404) {
-        return { books: [], total: 0 }; // Pas de résultats
-      }
-      throw new Error(`Open Library: HTTP ${res.status}`);
+      if (res.status === 404) return { books: [], total: 0 };
+      throw new Error(`Open Library : HTTP ${res.status}`);
     }
-    const data = await res.json();
 
-    const books: Book[] = (data.docs ?? []).map((d: any) => {
-      const workKey = d.key as string;
-      return {
-        workKey,
-        workId: toWorkId(workKey),
-        title: d.title ?? "Untitled",
-        authorName: Array.isArray(d.author_name) ? d.author_name[0] : undefined,
-        firstPublishYear: d.first_publish_year,
-        coverId: d.cover_i,
-      };
-    });
-
-    return { books, total: data.numFound ?? books.length };
+    const data = (await res.json()) as unknown;
+    return parseSearchResponse(data);
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw error; // Re-lancer AbortError
-    }
-    throw new Error(`Open Library: ${error instanceof Error ? error.message : "network error"}`);
+    if (error instanceof Error && error.name === "AbortError") throw error;
+    throw new Error(`Open Library : ${error instanceof Error ? error.message : "erreur reseau"}`);
   }
 }
 
@@ -67,230 +118,185 @@ export function coverUrl(coverId?: number, size: "S" | "M" | "L" = "M") {
   return `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg`;
 }
 
-export type RecentChange = {
-  id: string;
-  kind: string; // ex: "edit", "new", etc.
-  timestamp: string; // ISO
-  comment?: string;
-  author?: string;
-  link?: string; // lien vers openlibrary.org
-};
+function parseRecentChange(rawChange: unknown): RecentChange {
+  if (!isRecord(rawChange)) {
+    return {
+      id: String(crypto.randomUUID?.() ?? Math.random()),
+      kind: "modification",
+      timestamp: "",
+    };
+  }
 
-export async function getRecentChanges(
-  limit = 10,
-  signal?: AbortSignal,
-): Promise<RecentChange[]> {
-  const url = `https://openlibrary.org/recentchanges.json?limit=${limit}`;
+  const author =
+    isRecord(rawChange.author) && asString(rawChange.author.key)
+      ? asString(rawChange.author.key)
+      : asString(rawChange.author);
+
+  let link: string | undefined;
+  if (Array.isArray(rawChange.changes) && rawChange.changes.length > 0) {
+    const firstChange = rawChange.changes[0];
+    if (isRecord(firstChange)) {
+      const key = asString(firstChange.key);
+      if (key) link = `https://openlibrary.org${key}`;
+    }
+  }
+
+  return {
+    id: String(rawChange.id ?? crypto.randomUUID?.() ?? Math.random()),
+    kind: asString(rawChange.kind) ?? "modification",
+    timestamp: asString(rawChange.timestamp) ?? "",
+    comment: asString(rawChange.comment),
+    author,
+    link,
+  };
+}
+
+function isDocumentRecentChange(change: RecentChange): boolean {
+  const kind = change.kind.toLowerCase();
+  if (kind.includes("book")) return true;
+  return Boolean(change.link?.includes("/books/"));
+}
+
+export async function getRecentChanges(limit = 10, signal?: AbortSignal): Promise<RecentChange[]> {
+  const fetchLimit = Math.min(Math.max(limit * 5, limit), 200);
+  const url = `https://openlibrary.org/recentchanges.json?limit=${fetchLimit}`;
   const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error("RecentChanges: network error");
-  const data = await res.json();
+  if (!res.ok) throw new Error("Modifications recentes : erreur reseau");
 
-  return (data ?? []).map((c: any) => {
-    const id = String(c.id ?? crypto.randomUUID?.() ?? Math.random());
-    const kind = String(c.kind ?? "change");
-    const timestamp = String(c.timestamp ?? "");
-    const comment = c.comment ? String(c.comment) : undefined;
-
-    const author =
-      c.author?.key ? String(c.author.key) :
-      c.author ? String(c.author) :
-      undefined;
-
-    const link = c.changes?.[0]?.key
-      ? `https://openlibrary.org${c.changes[0].key}`
-      : undefined;
-
-    return { id, kind, timestamp, comment, author, link };
-  });
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return [];
+  return data.map(parseRecentChange).filter(isDocumentRecentChange).slice(0, limit);
 }
 
-// Type pour les paramètres de recherche avancée
-export type AdvancedSearchParams = {
-  title?: string;
-  author?: string;
-  first_publish_year?: number;
-  language?: string;
-  subject?: string; // tags
-  page?: number;
-  signal?: AbortSignal;
-};
+function parseLanguages(rawLanguages: unknown): string[] | undefined {
+  if (!Array.isArray(rawLanguages)) return undefined;
 
-// Fonction de recherche avancée
-export async function advancedSearchBooks(
-  params: AdvancedSearchParams
-): Promise<{ books: Book[]; total: number }> {
-  const { page = 1, signal, ...searchParams } = params;
+  const parsed = rawLanguages
+    .map((language) => {
+      if (typeof language === "string") return language;
+      if (!isRecord(language)) return undefined;
 
-  const url = new URL(`${BASE}/search.json`);
-  
-  // Ajouter seulement les paramètres non vides
-  // L'API Open Library accepte ces paramètres directement
-  if (searchParams.title) {
-    url.searchParams.set("title", searchParams.title);
-  }
-  if (searchParams.author) {
-    url.searchParams.set("author", searchParams.author);
-  }
-  if (searchParams.first_publish_year !== undefined) {
-    url.searchParams.set("first_publish_year", String(searchParams.first_publish_year));
-  }
-  if (searchParams.language) {
-    url.searchParams.set("language", searchParams.language);
-  }
-  if (searchParams.subject) {
-    url.searchParams.set("subject", searchParams.subject);
-  }
-  
-  url.searchParams.set("page", String(page));
+      const key = asString(language.key);
+      if (!key) return undefined;
+      return key.split("/").pop() ?? key;
+    })
+    .filter((language): language is string => Boolean(language));
 
-  try {
-    const res = await fetch(url.toString(), { signal });
-    if (!res.ok) {
-      // Gérer les erreurs HTTP de manière plus informative
-      if (res.status === 404) {
-        return { books: [], total: 0 }; // Pas de résultats
-      }
-      throw new Error(`Open Library: HTTP ${res.status}`);
-    }
-    const data = await res.json();
-
-    const books: Book[] = (data.docs ?? []).map((d: any) => {
-      const workKey = d.key as string;
-      return {
-        workKey,
-        workId: toWorkId(workKey),
-        title: d.title ?? "Untitled",
-        authorName: Array.isArray(d.author_name) ? d.author_name[0] : undefined,
-        firstPublishYear: d.first_publish_year,
-        coverId: d.cover_i,
-      };
-    });
-
-    return { books, total: data.numFound ?? books.length };
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw error; // Re-lancer AbortError
-    }
-    throw new Error(`Open Library: ${error instanceof Error ? error.message : "network error"}`);
-  }
+  return parsed.length > 0 ? parsed : undefined;
 }
 
-// Type pour les détails complets d'un livre
-export type BookDetails = {
-  workId: string;
-  title: string;
-  authors?: Array<{ name: string; key?: string }>;
-  firstPublishYear?: number;
-  coverId?: number;
-  description?: string;
-  subjects?: string[];
-  languages?: string[];
-  isbn?: string[];
-};
+function parseStringArray(rawValue: unknown): string[] | undefined {
+  if (!Array.isArray(rawValue)) return undefined;
+  const parsed = rawValue.filter((value): value is string => typeof value === "string");
+  return parsed.length > 0 ? parsed : undefined;
+}
 
-// Fonction pour récupérer les détails d'un livre
 export async function getBookDetails(
   workId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<BookDetails | null> {
   const url = `${BASE}/works/${workId}.json`;
-  
-  try {
-    const res = await fetch(url, { signal });
-    
-    // Gérer les 404 silencieusement
-    if (res.status === 404) {
-      return null;
-    }
-    
-    if (!res.ok) {
-      throw new Error(`Open Library: HTTP ${res.status}`);
-    }
-    
-    const data = await res.json();
-  
-    // Fonction helper pour récupérer le nom d'un auteur
-  async function getAuthorName(authorKey: string, signal?: AbortSignal): Promise<string> {
+
+  async function getAuthorName(authorKey: string, currentSignal?: AbortSignal): Promise<string> {
     try {
       const authorUrl = `${BASE}${authorKey}.json`;
-      const authorRes = await fetch(authorUrl, { signal });
-      
-      // Gérer les 404 silencieusement
+      const authorRes = await fetch(authorUrl, { signal: currentSignal });
+
       if (authorRes.status === 404) {
-        return "Unknown";
+        return "Inconnu";
       }
-      
+
       if (authorRes.ok) {
-        const authorData = await authorRes.json();
-        return authorData.name ?? "Unknown";
+        const authorData = (await authorRes.json()) as unknown;
+        return isRecord(authorData) ? asString(authorData.name) ?? "Inconnu" : "Inconnu";
       }
     } catch (error) {
-      // Ignore les erreurs réseau et AbortError
       if (error instanceof Error && error.name === "AbortError") {
-        throw error; // Re-lancer AbortError pour qu'il soit géré en haut
+        throw error;
       }
-      // Ignore les autres erreurs silencieusement
     }
-    return "Unknown";
+
+    return "Inconnu";
   }
-  
-  // Gérer les auteurs dans différents formats
-  let authors: Array<{ name: string; key?: string }> | undefined;
-  
-  if (data.authors && Array.isArray(data.authors)) {
-    // Récupérer les noms des auteurs (peut nécessiter des appels API supplémentaires)
-    const authorsPromises = data.authors.map(async (a: any) => {
-      // Priorité 1: utiliser le nom directement si disponible (plusieurs formats possibles)
-      if (a.name) {
-        return { name: a.name, key: a.key || a.author?.key };
-      }
-      if (a.author?.name) {
-        return { name: a.author.name, key: a.author.key };
-      }
-      
-      // Priorité 2: si on a une clé d'auteur, récupérer le nom via API
-      if (a.author?.key) {
-        const authorKey = a.author.key;
-        const authorName = await getAuthorName(authorKey, signal);
-        return { name: authorName, key: authorKey };
-      }
-      
-      // Priorité 3: si on a juste une clé directe
-      if (a.key && a.key.startsWith("/authors/")) {
-        const authorName = await getAuthorName(a.key, signal);
-        return { name: authorName, key: a.key };
-      }
-      
-      return { name: "Unknown" };
-    });
-    
-    authors = await Promise.all(authorsPromises);
-  } else if (data.author_name && Array.isArray(data.author_name)) {
-    authors = data.author_name.map((name: string) => ({ name }));
-  } else if (data.author_name && typeof data.author_name === "string") {
-    authors = [{ name: data.author_name }];
-  }
-  
-  return {
-    workId,
-    title: data.title ?? "Untitled",
-    authors,
-    firstPublishYear: data.first_publish_year,
-    coverId: data.covers?.[0] ?? data.covers,
-    description: typeof data.description === "string" 
-      ? data.description 
-      : data.description?.value,
-    subjects: data.subjects,
-    languages: data.languages,
-    isbn: data.isbn,
-  };
+
+  try {
+    const res = await fetch(url, { signal });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Open Library : HTTP ${res.status}`);
+
+    const data = (await res.json()) as unknown;
+    if (!isRecord(data)) return null;
+
+    let authors: Array<{ name: string; key?: string }> | undefined;
+
+    if (Array.isArray(data.authors)) {
+      const authorsPromises = data.authors.map(async (rawAuthor) => {
+        if (!isRecord(rawAuthor)) return { name: "Inconnu" };
+
+        const directName = asString(rawAuthor.name);
+        const directKey = asString(rawAuthor.key);
+        const nestedAuthor = isRecord(rawAuthor.author) ? rawAuthor.author : undefined;
+        const nestedName = nestedAuthor ? asString(nestedAuthor.name) : undefined;
+        const nestedKey = nestedAuthor ? asString(nestedAuthor.key) : undefined;
+
+        if (directName) return { name: directName, key: directKey ?? nestedKey };
+        if (nestedName) return { name: nestedName, key: nestedKey };
+
+        if (nestedKey) {
+          const authorName = await getAuthorName(nestedKey, signal);
+          return { name: authorName, key: nestedKey };
+        }
+
+        if (directKey?.startsWith("/authors/")) {
+          const authorName = await getAuthorName(directKey, signal);
+          return { name: authorName, key: directKey };
+        }
+
+        return { name: "Inconnu" };
+      });
+
+      authors = await Promise.all(authorsPromises);
+    } else if (Array.isArray(data.author_name)) {
+      authors = data.author_name
+        .filter((name): name is string => typeof name === "string")
+        .map((name) => ({ name }));
+    } else if (typeof data.author_name === "string") {
+      authors = [{ name: data.author_name }];
+    }
+
+    let coverId: number | undefined;
+    if (Array.isArray(data.covers)) {
+      coverId = data.covers.find((cover): cover is number => typeof cover === "number");
+    } else {
+      coverId = asNumber(data.covers);
+    }
+
+    let description: string | undefined;
+    if (typeof data.description === "string") {
+      description = data.description;
+    } else if (isRecord(data.description)) {
+      description = asString(data.description.value);
+    }
+
+    const isbn = Array.isArray(data.isbn)
+      ? data.isbn
+          .map((value) => (typeof value === "string" || typeof value === "number" ? String(value) : undefined))
+          .filter((value): value is string => Boolean(value))
+      : undefined;
+
+    return {
+      workId,
+      title: asString(data.title) ?? "Sans titre",
+      authors,
+      firstPublishYear: asNumber(data.first_publish_year),
+      coverId,
+      description,
+      subjects: parseStringArray(data.subjects),
+      languages: parseLanguages(data.languages),
+      isbn: isbn && isbn.length > 0 ? isbn : undefined,
+    };
   } catch (error) {
-    // Gérer les erreurs réseau
-    if (error instanceof Error && error.name === "AbortError") {
-      throw error; // Re-lancer AbortError
-    }
-    // Pour les autres erreurs (réseau, parsing, etc.), retourner null
+    if (error instanceof Error && error.name === "AbortError") throw error;
     return null;
   }
 }
-  

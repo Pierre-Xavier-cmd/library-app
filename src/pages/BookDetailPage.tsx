@@ -4,6 +4,7 @@ import { getBookDetails, coverUrl } from "../services/openLibrary";
 import type { BookDetails } from "../services/openLibrary";
 import { getWikipediaData } from "../services/wikipedia";
 import type { WikipediaData } from "../services/wikipedia";
+import { getErrorMessage, isAbortError } from "../utils/errors";
 
 export function BookDetailPage() {
   const { workId } = useParams<{ workId: string }>();
@@ -14,10 +15,11 @@ export function BookDetailPage() {
 
   useEffect(() => {
     if (!workId) {
-      setError("No work ID provided");
+      setError("Aucun identifiant d'ouvrage fourni.");
       setLoading(false);
       return;
     }
+    const currentWorkId: string = workId;
 
     const controller = new AbortController();
 
@@ -26,23 +28,23 @@ export function BookDetailPage() {
       setError(null);
 
       try {
-        // Récupérer les détails du livre
-        const bookData = await getBookDetails(workId, controller.signal);
-        
+        // Recuperer les details du livre.
+        const bookData = await getBookDetails(currentWorkId, controller.signal);
+
         if (!bookData) {
-          setError("Book not found");
+          setError("Livre introuvable.");
           setLoading(false);
           return;
         }
 
         setBook(bookData);
 
-        // Récupérer les données Wikipedia (chercher par titre)
+        // Recuperer les donnees Wikipedia (recherche par titre).
         const wikiData = await getWikipediaData(bookData.title, controller.signal);
         setWikipedia(wikiData);
-      } catch (e: any) {
-        if (e?.name === "AbortError") return;
-        setError(e?.message ?? "Error loading book details");
+      } catch (error: unknown) {
+        if (isAbortError(error)) return;
+        setError(getErrorMessage(error, "Erreur lors du chargement des details du livre"));
       } finally {
         setLoading(false);
       }
@@ -56,13 +58,13 @@ export function BookDetailPage() {
   }, [workId]);
 
   if (loading) {
-    return <p>Loading book details…</p>;
+    return <p>Chargement des details du livre...</p>;
   }
 
   if (error) {
     return (
       <section>
-        <p data-error>❌ {error}</p>
+        <p className="error-text">❌ {error}</p>
       </section>
     );
   }
@@ -70,7 +72,7 @@ export function BookDetailPage() {
   if (!book) {
     return (
       <section>
-        <p>Book not found.</p>
+        <p>Livre introuvable.</p>
       </section>
     );
   }
@@ -83,79 +85,74 @@ export function BookDetailPage() {
         <h1>{book.title}</h1>
       </header>
 
-      <div style={{ display: "flex", gap: "2rem", marginTop: "2rem" }}>
+      <div className="grid book-detail-grid">
         {coverImg && (
           <div>
-            <img src={coverImg} alt={`Cover of ${book.title}`} style={{ maxWidth: "300px" }} />
+            <img src={coverImg} alt={`Couverture de ${book.title}`} className="book-detail-cover" />
           </div>
         )}
 
         <div>
           {book.authors && book.authors.length > 0 && (
-            <div>
-              <h2>Author(s)</h2>
+            <section>
+              <h2>Auteur(s)</h2>
               <ul>
                 {book.authors.map((author, idx) => (
                   <li key={idx}>{author.name}</li>
                 ))}
               </ul>
-            </div>
+            </section>
           )}
 
           {book.firstPublishYear && (
-            <div>
-              <h2>First published</h2>
+            <section>
+              <h2>Premiere publication</h2>
               <p>{book.firstPublishYear}</p>
-            </div>
+            </section>
           )}
 
           {book.subjects && book.subjects.length > 0 && (
-            <div>
-              <h2>Subjects</h2>
+            <section>
+              <h2>Sujets</h2>
               <ul>
                 {book.subjects.slice(0, 10).map((subject, idx) => (
                   <li key={idx}>{subject}</li>
                 ))}
               </ul>
-            </div>
+            </section>
           )}
 
           {book.languages && book.languages.length > 0 && (
-            <div>
-              <h2>Languages</h2>
+            <section>
+              <h2>Langues</h2>
               <p>{book.languages.join(", ")}</p>
-            </div>
+            </section>
           )}
 
           {book.description && (
-            <div>
+            <section>
               <h2>Description</h2>
               <p>{book.description}</p>
-            </div>
+            </section>
           )}
         </div>
       </div>
 
       {wikipedia && (
-        <div style={{ marginTop: "3rem", padding: "1rem", border: "1px solid #ccc", borderRadius: "8px" }}>
-          <h2>Wikipedia Information</h2>
-          
-          {wikipedia.thumbnail && (
-            <img 
-              src={wikipedia.thumbnail} 
-              alt={wikipedia.title}
-              style={{ maxWidth: "200px", float: "right", marginLeft: "1rem" }}
-            />
-          )}
-          
-          <p>{wikipedia.extract}</p>
-          
+        <article>
+          <h2>Informations Wikipedia</h2>
+          <div className="grid wiki-grid">
+            {wikipedia.thumbnail && (
+              <img src={wikipedia.thumbnail} alt={wikipedia.title} className="wiki-thumb" />
+            )}
+            <p>{wikipedia.extract}</p>
+          </div>
           <p>
             <a href={wikipedia.url} target="_blank" rel="noopener noreferrer">
-              Read more on Wikipedia →
+              Lire la suite sur Wikipedia →
             </a>
           </p>
-        </div>
+        </article>
       )}
     </section>
   );

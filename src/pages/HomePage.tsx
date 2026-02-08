@@ -1,31 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import type { Book, SearchType } from "../services/openLibrary";
-import { coverUrl, quickSearchBooks } from "../services/openLibrary";
+import { searchBooks } from "../services/openLibrary";
 import { RecentChanges } from "../components/recent/RecentChanges";
-
-function BookCard({ book }: { book: Book }) {
-  const img = coverUrl(book.coverId, "M");
-  return (
-    <article data-book-card>
-      <div>
-        {img ? (
-          <img src={img} alt={`Cover of ${book.title}`} />
-        ) : (
-          <div data-cover-placeholder />
-        )}
-      </div>
-
-      <div>
-        <h3>
-          <Link to={`/book/${book.workId}`}>{book.title}</Link>
-        </h3>
-        <p>{book.authorName ?? "Unknown author"}</p>
-        {book.firstPublishYear && <p>{book.firstPublishYear}</p>}
-      </div>
-    </article>
-  );
-}
+import { BookCard } from "../components/books/BookCard";
+import { getErrorMessage, isAbortError } from "../utils/errors";
 
 export function HomePage() {
   const [sp] = useSearchParams();
@@ -51,16 +30,16 @@ export function HomePage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await quickSearchBooks({
+        const res = await searchBooks({
           q: query,
           type,
           page: 1,
           signal: controller.signal,
         });
         setBooks(res.books);
-      } catch (e: any) {
-        if (e?.name === "AbortError") return;
-        setError(e?.message ?? "Error");
+      } catch (error: unknown) {
+        if (isAbortError(error)) return;
+        setError(getErrorMessage(error, "Erreur"));
       } finally {
         setLoading(false);
       }
@@ -74,19 +53,20 @@ export function HomePage() {
 
   return (
     <>
-      <RecentChanges limit={10} />
-      {!q.trim() && <p>Type something in the search bar above to find books.</p>}
+      {!q.trim() && <p>Saisissez une recherche dans la barre ci-dessus pour trouver des livres.</p>}
 
-      {loading && <p>Loading…</p>}
-      {error && <p data-error>❌ {error}</p>}
+      {loading && <p>Chargement…</p>}
+      {error && <p className="error-text">❌ {error}</p>}
 
-      {!loading && !error && q.trim() && books.length === 0 && <p>No results.</p>}
+      {!loading && !error && q.trim() && books.length === 0 && <p>Aucun resultat.</p>}
 
-      <section data-books-grid>
+      <section className="book-list">
         {books.map((book) => (
           <BookCard key={book.workKey} book={book} />
         ))}
       </section>
+
+      <RecentChanges limit={5} />
     </>
   );
 }

@@ -1,9 +1,7 @@
 export function Footer() {
   return (
-    <footer data-site-footer>
-      <div data-container>
-        <small>Data from Open Library & Wikipedia</small>
-      </div>
+    <footer className="container site-footer">
+      <small>Donnees provenant de Open Library et Wikipedia</small>
     </footer>
   );
 }

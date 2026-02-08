@@ -1,29 +1,9 @@
-import { FormEvent, useState } from "react";
-import { Link } from "react-router-dom";
-import type { Book, AdvancedSearchParams } from "../services/openLibrary";
-import { advancedSearchBooks, coverUrl } from "../services/openLibrary";
-
-function BookCard({ book }: { book: Book }) {
-  const img = coverUrl(book.coverId, "M");
-  return (
-    <article data-book-card>
-      <div>
-        {img ? (
-          <img src={img} alt={`Cover of ${book.title}`} />
-        ) : (
-          <div data-cover-placeholder />
-        )}
-      </div>
-      <div>
-        <h3>
-          <Link to={`/book/${book.workId}`}>{book.title}</Link>
-        </h3>
-        <p>{book.authorName ?? "Unknown author"}</p>
-        {book.firstPublishYear && <p>{book.firstPublishYear}</p>}
-      </div>
-    </article>
-  );
-}
+import { useState } from "react";
+import type { FormEvent } from "react";
+import type { Book, SearchBooksParams } from "../services/openLibrary";
+import { searchBooks } from "../services/openLibrary";
+import { BookCard } from "../components/books/BookCard";
+import { getErrorMessage } from "../utils/errors";
 
 export function AdvancedSearchPage() {
   const [title, setTitle] = useState("");
@@ -38,18 +18,18 @@ export function AdvancedSearchPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    
-    // Vérifier qu'au moins un champ est rempli
+
+    // Verifier qu'au moins un champ est rempli.
     if (!title.trim() && !author.trim() && !year.trim() && !subject.trim() && !language.trim()) {
-      setError("Please fill in at least one field");
+      setError("Veuillez remplir au moins un champ.");
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
-      const params: AdvancedSearchParams = {};
+      const params: SearchBooksParams = {};
       if (title.trim()) params.title = title.trim();
       if (author.trim()) params.author = author.trim();
       if (year.trim()) {
@@ -60,18 +40,18 @@ export function AdvancedSearchPage() {
       }
       if (subject.trim()) params.subject = subject.trim();
       if (language.trim()) params.language = language.trim();
-      
-      // Vérifier qu'on a au moins un paramètre valide
+
+      // Verifier qu'on a au moins un parametre valide.
       if (Object.keys(params).length === 0) {
-        setError("Please provide at least one valid search criteria");
+        setError("Veuillez fournir au moins un critere de recherche valide.");
         setLoading(false);
         return;
       }
-      
-      const res = await advancedSearchBooks(params);
+
+      const res = await searchBooks(params);
       setBooks(res.books);
-    } catch (e: any) {
-      setError(e?.message ?? "Error during search");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, "Erreur pendant la recherche"));
     } finally {
       setLoading(false);
     }
@@ -80,84 +60,84 @@ export function AdvancedSearchPage() {
   return (
     <section>
       <header>
-        <h1>Advanced search</h1>
-        <p>Build precise queries (author, date, tags, language…).</p>
+        <h1>Recherche avancee</h1>
+        <p>Construisez des requetes precises (auteur, date, mots-cles, langue...).</p>
       </header>
 
       <form onSubmit={handleSubmit}>
         <div>
-          <label htmlFor="title">Title</label>
+          <label htmlFor="title">Titre</label>
           <input
             id="title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Book title"
+            placeholder="Titre du livre"
           />
         </div>
 
         <div>
-          <label htmlFor="author">Author</label>
+          <label htmlFor="author">Auteur</label>
           <input
             id="author"
             type="text"
             value={author}
             onChange={(e) => setAuthor(e.target.value)}
-            placeholder="Author name"
+            placeholder="Nom de l'auteur"
           />
         </div>
 
         <div>
-          <label htmlFor="year">First publish year</label>
+          <label htmlFor="year">Annee de premiere publication</label>
           <input
             id="year"
             type="number"
             value={year}
             onChange={(e) => setYear(e.target.value)}
-            placeholder="e.g. 1984"
+            placeholder="Ex. 1984"
             min="1000"
-            max="2026"
+            max={new Date().getFullYear()}
           />
         </div>
 
         <div>
-          <label htmlFor="subject">Subject / Tags</label>
+          <label htmlFor="subject">Sujet / Tags</label>
           <input
             id="subject"
             type="text"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
-            placeholder="e.g. fiction, science"
+            placeholder="Ex. fiction, science"
           />
         </div>
 
         <div>
-          <label htmlFor="language">Language</label>
+          <label htmlFor="language">Langue</label>
           <input
             id="language"
             type="text"
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            placeholder="e.g. eng, fra"
+            placeholder="Ex. eng, fra"
           />
         </div>
 
         <button type="submit" disabled={loading}>
-          {loading ? "Searching…" : "Search"}
+          {loading ? "Recherche..." : "Rechercher"}
         </button>
       </form>
 
-      {error && <p data-error>❌ {error}</p>}
+      {error && <p className="error-text">❌ {error}</p>}
 
       {!loading && !error && books.length === 0 && title === "" && author === "" && year === "" && subject === "" && language === "" && (
-        <p>Fill in at least one field to search.</p>
+        <p>Remplissez au moins un champ pour lancer la recherche.</p>
       )}
 
       {!loading && !error && books.length === 0 && (title !== "" || author !== "" || year !== "" || subject !== "" || language !== "") && (
-        <p>No results found.</p>
+        <p>Aucun resultat trouve.</p>
       )}
 
-      <section data-books-grid>
+      <section className="book-list">
         {books.map((book) => (
           <BookCard key={book.workKey} book={book} />
         ))}

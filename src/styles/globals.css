@@ -1,118 +1,84 @@
 :root {
-  --app-max-width: 1100px;
   color-scheme: light;
 }
 
-body {
-  margin: 0;
-  background: #f6f6f6;
-}
-
-[data-app] {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-[data-site-header] {
-  padding: 1rem 0;
-  border-bottom: 1px solid #e6e6e6;
-  background: #fff;
-}
-
 main {
-  flex: 1;
-  padding: 1.25rem 0;
+  padding-block: var(--pico-spacing);
 }
 
-[data-site-footer] {
-  margin-top: 2rem;
-  padding: 1.5rem 0;
-  border-top: 1px solid #e6e6e6;
-  background: #fff;
+.search-form {
+  margin: 0 0 var(--pico-spacing);
 }
 
-[data-container] {
-  width: min(var(--app-max-width), 100% - 2rem);
-  margin: 0 auto;
+.search-form fieldset {
+  margin: 0;
 }
 
-[data-header] {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-[data-nav-links] {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-[data-brand] {
-  font-weight: 700;
-  text-decoration: none;
-}
-
-[data-search-form] {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-  min-width: 260px;
-}
-
-[data-search-form] input {
-  min-width: 180px;
-}
-
-[data-books-grid] {
+.book-list {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  margin-top: 1rem;
+  gap: var(--pico-spacing);
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  margin-top: var(--pico-spacing);
 }
 
-article[data-book-card] {
+.book-card {
   display: grid;
-  grid-template-columns: 70px 1fr;
+  grid-template-columns: 4.5rem 1fr;
   gap: 1rem;
   align-items: start;
+  margin: 0;
 }
 
-article[data-book-card] h3 {
+.book-card h3 {
   margin: 0 0 0.25rem;
   font-size: 1rem;
 }
 
-article[data-book-card] p {
-  margin: 0.2rem 0;
-  color: #555;
+.book-card p {
+  margin: 0.15rem 0;
 }
 
-article[data-book-card] img,
-[data-cover-placeholder] {
-  width: 70px;
-  height: 100px;
-  border-radius: 0.5rem;
+.book-cover,
+.book-cover-placeholder {
+  width: 4.5rem;
+  height: 6.5rem;
+  border-radius: var(--pico-border-radius);
   object-fit: cover;
-  background: #e6e6e6;
+  background: var(--pico-muted-border-color);
 }
 
-[data-panel-header] {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
+.book-detail-grid {
+  align-items: start;
 }
 
-[data-list] {
-  display: grid;
-  gap: 0.5rem;
-  padding-left: 1.25rem;
+.book-detail-cover {
+  width: min(100%, 18rem);
+  height: auto;
+  display: block;
+  border-radius: var(--pico-border-radius);
 }
 
-[data-error] {
-  color: #b00020;
+.wiki-grid {
+  align-items: start;
+}
+
+.wiki-thumb {
+  width: min(100%, 12rem);
+  height: auto;
+  display: block;
+  border-radius: var(--pico-border-radius);
+}
+
+.error-text {
+  color: var(--pico-del-color);
+}
+
+.site-footer {
+  padding-block: var(--pico-spacing);
+}
+
+@media (max-width: 640px) {
+  .book-card {
+    grid-template-columns: 1fr;
+  }
 }
